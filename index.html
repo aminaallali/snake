@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Snake Game</title>
+    <!-- Required meta tags for Telegram Mini Apps -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="MobileOptimized" content="176" />
+    <meta name="HandheldFriendly" content="True" />
+    <meta name="robots" content="noindex,nofollow" />
+
+    <!-- Telegram Web App JavaScript -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <!-- Initialize Telegram Web App and set theme class -->
+    <script>
+        function setThemeClass() {
+            document.documentElement.className = Telegram.WebApp.colorScheme;
+        }
+        Telegram.WebApp.onEvent('themeChanged', setThemeClass);
+        setThemeClass();
+        Telegram.WebApp.ready();
+    </script>
+
+    <!-- Beautiful CSS styling -->
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #222);
+            font-family: Helvetica, sans-serif;
+            font-size: 14px;
+            overflow: hidden; /* Prevent scrolling */
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+            background-color: #000;
+            border: 5px solid var(--tg-theme-hint-color, #ccc);
+        }
+
+        #score {
+            color: var(--tg-theme-text-color, #222);
+            text-align: center;
+            font-family: 'Arial', sans-serif;
+            font-size: 24px;
+            margin-top: 10px;
+        }
+
+        /* Game Over Screen */
+        #gameOver {
+            display: none;
+            text-align: center;
+            color: var(--tg-theme-text-color, #222);
+            margin-top: 50px;
+        }
+
+        #gameOver h1 {
+            font-size: 48px;
+            margin-top: 20px;
+        }
+
+        #gameOver p {
+            font-size: 24px;
+        }
+
+        #restartButton, #closeButton {
+            padding: 10px 20px;
+            font-size: 18px;
+            background-color: var(--tg-theme-button-color, #1c7ed6);
+            color: var(--tg-theme-button-text-color, #fff);
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+
+        #restartButton:hover, #closeButton:hover {
+            opacity: 0.9;
+        }
+    </style>
+
+</head>
+<body>
+
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+    <div id="score">Score: 0</div>
+
+    <div id="gameOver">
+        <h1>Game Over</h1>
+        <p>Your Score: <span id="finalScore">0</span></p>
+        <button id="restartButton">Restart Game</button>
+        <button id="closeButton">Close</button>
+    </div>
+
+    <!-- JavaScript code for the snake game -->
+    <script>
+        (function(){
+            // Game variables
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const box = 20;
+            let score = 0;
+            let game;
+            let direction;
+
+            let snake = [];
+            snake[0] = {
+                x : 10 * box,
+                y : 10 * box
+            };
+
+            let food = {
+                x : Math.floor(Math.random() * 19 + 1) * box,
+                y : Math.floor(Math.random() * 19 + 1) * box
+            };
+
+            // Listen to keyboard events for direction changes
+            document.addEventListener('keydown', changeDirection);
+
+            function changeDirection(event){
+                let key = event.keyCode;
+                if( key == 37 && direction != 'RIGHT'){
+                    direction = 'LEFT';
+                } else if(key == 38 && direction != 'DOWN'){
+                    direction = 'UP';
+                } else if(key == 39 && direction != 'LEFT'){
+                    direction = 'RIGHT';
+                } else if(key == 40 && direction != 'UP'){
+                    direction = 'DOWN';
+                }
+            }
+
+            function collision(head, array){
+                for(let i = 0; i < array.length; i++){
+                    if(head.x == array[i].x && head.y == array[i].y){
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            function getCSSVariable(name){
+                return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+            }
+
+            function draw(){
+                let bgColor = getCSSVariable('--tg-theme-bg-color') || '#fff';
+                ctx.fillStyle = bgColor;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                for( let i = 0; i < snake.length ; i++){
+                    ctx.fillStyle = ( i == 0 ) ? 'lime' : 'green';
+                    ctx.fillRect(snake[i].x, snake[i].y, box, box);
+
+                    ctx.strokeStyle = getCSSVariable('--tg-theme-hint-color') || '#ccc';
+                    ctx.strokeRect(snake[i].x, snake[i].y, box, box);
+                }
+
+                ctx.fillStyle = 'red';
+                ctx.fillRect(food.x, food.y, box, box);
+
+                let snakeX = snake[0].x;
+                let snakeY = snake[0].y;
+
+                if(direction == 'LEFT') snakeX -= box;
+                if(direction == 'UP') snakeY -= box;
+                if(direction == 'RIGHT') snakeX += box;
+                if(direction == 'DOWN') snakeY += box;
+
+                // Game over conditions
+                if(snakeX < 0 || snakeX >= canvas.width || snakeY < 0 || snakeY >= canvas.height || collision({x:snakeX, y:snakeY}, snake)){
+                    clearInterval(game);
+                    document.getElementById('gameOver').style.display = 'block';
+                    document.getElementById('finalScore').innerText = score;
+                    // Send the score back to the bot
+                    Telegram.WebApp.sendData('score=' + score);
+                    return;
+                }
+
+                // If the snake eats the food
+                if(snakeX == food.x && snakeY == food.y){
+                    score++;
+                    document.getElementById('score').innerText = 'Score: ' + score;
+                    food = {
+                        x : Math.floor(Math.random() * 19 + 1) * box,
+                        y : Math.floor(Math.random() * 19 + 1) * box
+                    };
+                } else {
+                    snake.pop();
+                }
+
+                let newHead = {
+                    x : snakeX,
+                    y : snakeY
+                };
+
+                snake.unshift(newHead);
+            }
+
+            // Start the game loop
+            game = setInterval(draw, 100);
+
+            // Restart game function
+            document.getElementById('restartButton').addEventListener('click', function(){
+                // Reset game variables
+                score = 0;
+                document.getElementById('score').innerText = 'Score: 0';
+                snake = [];
+                snake[0] = {
+                    x : 10 * box,
+                    y : 10 * box
+                };
+                direction = null;
+                food = {
+                    x : Math.floor(Math.random() * 19 + 1) * box,
+                    y : Math.floor(Math.random() * 19 + 1) * box
+                };
+                document.getElementById('gameOver').style.display = 'none';
+                game = setInterval(draw, 100);
+            });
+
+            // Close the mini app
+            document.getElementById('closeButton').addEventListener('click', function(){
+                Telegram.WebApp.close();
+            });
+
+        })();
+    </script>
+
+</body>
+</html>
